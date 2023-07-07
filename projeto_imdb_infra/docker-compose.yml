@@ -1,0 +1,289 @@
+version: '3.7'
+networks:
+  projeto-imdb-network:
+      driver: bridge
+      ipam:
+          driver: default
+          config:
+              - subnet: "172.10.0.0/16"
+                gateway: "172.10.0.1"
+
+# Settings and configurations that are common for all minio containers
+x-minio-common: &minio-common
+  image: minio/minio:RELEASE.2023-02-22T18-23-45Z
+  command: server --console-address ":9001" http://minio{1...4}/data{1...2}
+  expose:
+    - "9000"
+    - "9001"
+  environment:
+    MINIO_ROOT_USER: minioadmin
+    MINIO_ROOT_PASSWORD: minioadmin
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+    interval: 30s
+    timeout: 20s
+    retries: 3
+
+# Settings dna configuration for apache-airflow
+x-airflow-common: &airflow-common
+  build:
+    dockerfile: ./docker/airflow/Dockerfile
+  # image: apache/airflow:2.5.1-python3.8
+  user: "${AIRFLOW_UID}:0"
+  env_file:
+    - ./docker/airflow/.env
+  volumes:
+    - ../projeto_imdb/airflow_dags:/opt/airflow/dags
+    - ../data/airflow/logs:/opt/airflow/logs
+    - ../data/airflow/downloads:/opt/airflow/downloads
+    - ../data/airflow/plugins:/opt/airflow/plugins
+    - /var/run/docker.sock:/var/run/docker.sock
+
+x-airflow-depends-on: &airflow-depends-on
+  depends_on:
+    airflow-database:
+      condition: service_healthy
+    airflow-init:
+      condition: service_completed_successfully
+
+
+services:
+  minio-server-kevin:
+    <<: *minio-common
+    container_name: minio-server-kevin
+    hostname: minio1
+    volumes:
+      - ../data/minio/data1-1:/data1
+      - ../data/minio/data1-2:/data2
+    networks:
+      projeto-imdb-network:
+        ipv4_address: 172.10.0.16
+
+  minio-server-dave:
+    <<: *minio-common
+    container_name: minio-server-dave
+    hostname: minio2
+    volumes:
+      - ../data/minio/data2-1:/data1
+      - ../data/minio/data2-2:/data2
+    networks:
+      projeto-imdb-network:
+        ipv4_address: 172.10.0.17
+
+  minio-server-carl:
+    <<: *minio-common
+    container_name: minio-server-carl
+    hostname: minio3
+    volumes:
+      - ../data/minio/data3-1:/data1
+      - ../data/minio/data3-2:/data2
+    networks:
+      projeto-imdb-network:
+        ipv4_address: 172.10.0.18
+
+  minio-server-bob:
+    <<: *minio-common
+    container_name: minio-server-bob
+    hostname: minio4
+    volumes:
+      - ../data/minio/data4-1:/data1
+      - ../data/minio/data4-2:/data2
+    networks:
+      projeto-imdb-network:
+        ipv4_address: 172.10.0.19
+
+  minio-webserver:
+    container_name: minio-webserver
+    image: nginx:1.19.2-alpine
+    hostname: minio-webserver
+    volumes:
+      - ./docker/minio/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    depends_on:
+      - minio-server-bob
+      - minio-server-kevin
+      - minio-server-carl
+      - minio-server-dave
+    networks:
+      projeto-imdb-network:
+        ipv4_address: 172.10.0.20
+
+
+  # Airflow Services
+  airflow-database:
+    container_name: airflow-database
+    image: postgres:latest
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 5
+    env_file:
+      - ./docker/airflow/.env
+    volumes:
+      - ../data/airflow/postgres-data:/var/lib/postgresql/data
+    networks:
+      projeto-imdb-network:
+        ipv4_address: 172.10.0.110
+
+  airflow-scheduler:
+    <<: [*airflow-common,*airflow-depends-on]
+    container_name: airflow-scheduler
+    command: scheduler
+    restart: on-failure
+    ports:
+      - "8793:8793"
+    networks:
+      projeto-imdb-network:
+        ipv4_address: 172.10.0.111
+
+  airflow-webserver:
+    <<: [*airflow-common,*airflow-depends-on]
+    container_name: airflow-webserver
+    restart: always
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 30s
+      retries: 5
+    networks:
+        projeto-imdb-network:
+          ipv4_address: 172.10.0.112
+
+  airflow-init:
+    <<: *airflow-common
+    container_name: airflow-init
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        mkdir -p /sources/logs /sources/dags /sources/plugins /sources/downloads
+        chmod 777 -R /sources/downloads
+        chown -R "${AIRFLOW_UID}:0" /sources/{logs,dags,plugins,downloads}
+        exec /entrypoint airflow version
+    networks:
+      - projeto-imdb-network
+
+  # Jupyter Lab Service
+  jupyterlab-server:
+    container_name: jupyterlab-server
+    build:
+      dockerfile: ./docker/jupyterlab/Dockerfile
+    volumes:
+     - ../data/jupyter-notebooks/:/notebooks
+    ports:
+      - "8888:8888"
+      - "20020:20020"
+    environment:
+      - JUPYTER_ENABLE_LAB=1
+      - SPARK_MASTER_IP=127.0.0.1
+    command: start-notebook.sh --NotebookApp.notebook_dir=/notebooks --NotebookApp.token='' --NotebookApp.password=''
+    networks:
+      projeto-imdb-network:
+        ipv4_address: 172.10.0.10
+
+  # Postgreql Service
+  postgres-server:
+    container_name: postgres-server
+    image: postgres:15.2-alpine3.17
+    ports:
+      - "5431:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      retries: 5
+    env_file:
+      - ./docker/postgresql/.env
+    volumes:
+      - ../data/postgresql/data:/var/lib/postgresql/data
+      - ./docker/postgresql/create-multiple-postgresql-databases.sh:/docker-entrypoint-initdb.d/01-create-db.sh
+    networks:
+      projeto-imdb-network:
+        ipv4_address: 172.10.0.6
+
+  #Metabase Service
+  metabase-app:
+    container_name: metabase-app
+    image: metabase/metabase:v0.45.3
+    restart: always
+    ports:
+      - "3001:3000"
+    volumes:
+      # declare your mount volume /host/dir:/container/dir
+      - ../data/metabase/data:/metabase-data
+    env_file:
+      - ./docker/metabase/.env
+    depends_on:
+      - postgres-server
+    links:
+      - postgres-server
+    networks:
+      projeto-imdb-network:
+        ipv4_address: 172.10.0.25
+
+  #Cluster Spark
+  spark-master:
+    container_name: spark-master
+    image: docker.io/bitnami/spark:3.3
+    hostname: spark-master
+    ports:
+      - "9090:8080"
+      - "7077:7077"
+    volumes:
+      - ../data/spark/apps:/opt/spark-apps
+      - ../data/spark/data:/opt/spark-data
+    environment:
+      - SPARK_LOCAL_IP=spark-master
+      - SPARK_WORKLOAD=master
+    networks:
+      - projeto-imdb-network
+
+  spark-worker-a:
+    container_name: spark-worker-a
+    image: docker.io/bitnami/spark:3.3
+    ports:
+      - "9091:8080"
+      - "7000:7000"
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_MASTER=spark://spark-master:7077
+      - SPARK_WORKER_CORES=2
+      - SPARK_WORKER_MEMORY=2G
+      - SPARK_DRIVER_MEMORY=2G
+      - SPARK_EXECUTOR_MEMORY=2G
+      - SPARK_WORKLOAD=worker
+      - SPARK_LOCAL_IP=spark-worker-a
+    volumes:
+      - ../data/spark/apps:/opt/spark-apps
+      - ../data/spark/data:/opt/spark-data
+    networks:
+      - projeto-imdb-network
+
+  spark-worker-b:
+    container_name: spark-worker-b
+    image: docker.io/bitnami/spark:3.3
+    ports:
+      - "9092:8080"
+      - "7001:7000"
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_MASTER=spark://spark-master:7077
+      - SPARK_WORKER_CORES=2
+      - SPARK_WORKER_MEMORY=2G
+      - SPARK_DRIVER_MEMORY=2G
+      - SPARK_EXECUTOR_MEMORY=2G
+      - SPARK_WORKLOAD=worker
+      - SPARK_LOCAL_IP=spark-worker-b
+    volumes:
+      - ../data/spark/apps:/opt/spark-apps
+      - ../data/spark/data:/opt/spark-data
+    networks:
+      - projeto-imdb-network
