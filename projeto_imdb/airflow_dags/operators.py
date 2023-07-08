@@ -1,15 +1,14 @@
+import logging
 import os
+from datetime import datetime
 from io import StringIO
 
-from airflow import DAG
-from airflow.operators.python import PythonOperator
-from datetime import datetime
-import logging
-from bs4 import BeautifulSoup as bs
 import requests
-from s3_services import s3_client
-import pandas as pd
+from bs4 import BeautifulSoup as bs
 
+from s3_services import s3_client
+from spark_services import spark_client
+import pandas as pd
 
 def obterListaArquivosDisponiveis():
     try:
@@ -59,34 +58,44 @@ def fazerDownloadArquivos():
         fazerDownloadArquivo(url)
 
 
-def descompactarArquivosBaixados():
+def descompactarArquivoBaixado(nomeArquivoCompactado: str):
     bucketRaw = "projeto-imdb-raw"
     bucketStage = "projeto-imdb-stage"
 
     objetosS3 = s3_client.list_objects(Bucket=bucketRaw)
-    try:
-        for obj in objetosS3.get("Contents"):
-            chave = obj["Key"]
-            data, diretorio, nomeArquivo = chave.split("/")
 
-            if diretorio == "downloaded":
-                arquivoCompactado = s3_client.get_object(
-                    Bucket="projeto-imdb-raw",
-                    Key=chave
-                ).get("Body")
+    for obj in objetosS3.get("Contents"):
+        chave = obj["Key"]
+        dataArquivo, diretorio, nomeArquivo = chave.split("/")
+
+        if diretorio == "downloaded" and nomeArquivo == nomeArquivoCompactado:
+            arquivoCompactado = s3_client.get_object(
+                Bucket="projeto-imdb-raw",
+                Key=chave
+            ).get("Body")
+
+            logging.info(f"Descompactando arquivo {chave}")
+            nomeArquivoCsv = nomeArquivo.replace(".tsv.gz", ".csv")
+
+            # rdd = spark_client.read.csv(f"s3a://{bucketRaw}/{chave}", sep="\t", header=True)
+            #
+            # rdd.write.option("header", True) \
+            #     .option("delimiter", ",") \
+            #     .csv(f"s3a://{bucketStage}/{nomeArquivoCsv}")
 
             dfArquivo = pd.read_csv(arquivoCompactado, compression="gzip", header=0, sep="\t", quotechar='"')
             logging.info(f"Processando arquivo {chave}")
 
             csv_buffer = StringIO()
-            dfArquivo.to_csv(csv_buffer)
+            dfArquivo.to_csv(csv_buffer,index=False)
 
-            nomeArquivoCsv = nomeArquivo.replace(".tsv.gz", ".csv")
             s3_client.put_object(Body=csv_buffer.getvalue(), Bucket=bucketStage,
                                  Key=nomeArquivoCsv)
 
+
             logging.info(f"Arquivo {nomeArquivoCsv} salvo no bucket stage.")
 
+            # Fazer cópia do arquivo para a pasta processado e apagar da pasta de download
             s3_client.copy_object(
                 CopySource={'Bucket': bucketRaw, 'Key': chave},
                 Bucket=bucketRaw,
@@ -96,26 +105,6 @@ def descompactarArquivosBaixados():
 
             logging.info(f"Arquivo {nomeArquivo} movido para a pasta de processados.")
 
-    except Exception as e:
-        logging.error(e)
 
-
-with DAG(
-        "projeto_imdb_download_arquivos",
-        description="Fazer o download diário dos arquivos do Imdb",
-        schedule_interval=None,
-        start_date=datetime(2023, 1, 1)
-) as dag:
-    task_fazer_download_arquivos = PythonOperator(
-        task_id="tsk_baixar_arquivos_imdb",
-        python_callable=fazerDownloadArquivos,
-        dag=dag
-    )
-
-    task_descompactar_arquivos_baixados = PythonOperator(
-        task_id="tsk_descompactar_arquivos_imdb",
-        python_callable=descompactarArquivosBaixados,
-        dag=dag
-    )
-
-task_fazer_download_arquivos >> task_descompactar_arquivos_baixados
+def converterArquivoParaParquet():
+    pass

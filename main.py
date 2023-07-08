@@ -43,6 +43,6 @@ if __name__ == '__main__':
     dataList = [("Java", 20000), ("Python", 100000), ("Scala", 3000)]
     rdd = spark.sparkContext.parallelize(dataList)
 
-    print(rdd.take(1))
+    print(rdd.take(5))
 
 

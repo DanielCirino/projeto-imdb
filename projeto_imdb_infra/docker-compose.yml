@@ -179,7 +179,7 @@ services:
      - ../data/jupyter-notebooks/:/notebooks
     ports:
       - "8888:8888"
-      - "20020:20020"
+      - "20021:20020"
     environment:
       - JUPYTER_ENABLE_LAB=1
       - SPARK_MASTER_IP=127.0.0.1
@@ -235,14 +235,17 @@ services:
     ports:
       - "9090:8080"
       - "7077:7077"
+      - "20020:20020"
     volumes:
       - ../data/spark/apps:/opt/spark-apps
       - ../data/spark/data:/opt/spark-data
     environment:
       - SPARK_LOCAL_IP=spark-master
       - SPARK_WORKLOAD=master
+      - SPARK_MASTER_IP=127.0.0.1
     networks:
-      - projeto-imdb-network
+      projeto-imdb-network:
+        ipv4_address: 172.10.0.30
 
   spark-worker-a:
     container_name: spark-worker-a
@@ -264,7 +267,8 @@ services:
       - ../data/spark/apps:/opt/spark-apps
       - ../data/spark/data:/opt/spark-data
     networks:
-      - projeto-imdb-network
+      projeto-imdb-network:
+        ipv4_address: 172.10.0.31
 
   spark-worker-b:
     container_name: spark-worker-b
@@ -286,4 +290,5 @@ services:
       - ../data/spark/apps:/opt/spark-apps
       - ../data/spark/data:/opt/spark-data
     networks:
-      - projeto-imdb-network
+      projeto-imdb-network:
+        ipv4_address: 172.10.0.32
