@@ -32,17 +32,10 @@ if __name__ == '__main__':
 
     spark = SparkSession(sc)
 
+    rdd = spark.read.csv(f"s3a://projeto-imdb-raw/2023-07-07/downloaded/title.ratings.tsv.gz", sep="\t", header=True)
 
-    # spark = SparkSession.builder \
-    #     .master("local[0]") \
-    #     .appName("projeto-imdb") \
-    #     .config("spark.memory.offHeap.enabled", "true") \
-    #     .config("spark.memory.offHeap.size", "10g") \
-    #     .getOrCreate()
+    rdd.write.option("header", True) \
+        .option("delimiter", ",") \
+        .csv(f"s3a://projeto-imdb-raw/title.ratings.csv")
 
-    dataList = [("Java", 20000), ("Python", 100000), ("Scala", 3000)]
-    rdd = spark.sparkContext.parallelize(dataList)
-
-    print(rdd.take(5))
-
-
+print(rdd.show(5))

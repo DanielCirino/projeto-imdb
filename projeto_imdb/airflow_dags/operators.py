@@ -1,7 +1,7 @@
 import logging
 import os
 from datetime import datetime
-from io import StringIO
+from io import StringIO, BytesIO
 
 import requests
 from bs4 import BeautifulSoup as bs
@@ -86,6 +86,7 @@ def descompactarArquivoBaixado(nomeArquivoCompactado: str):
             dfArquivo = pd.read_csv(arquivoCompactado, compression="gzip", header=0, sep="\t", quotechar='"')
             logging.info(f"Processando arquivo {chave}")
 
+
             csv_buffer = StringIO()
             dfArquivo.to_csv(csv_buffer,index=False)
 
@@ -106,5 +107,26 @@ def descompactarArquivoBaixado(nomeArquivoCompactado: str):
             logging.info(f"Arquivo {nomeArquivo} movido para a pasta de processados.")
 
 
-def converterArquivoParaParquet():
-    pass
+def converterArquivoParaParquet(nomeArquivo:str):
+    bucketStage = "projeto-imdb-stage"
+    bucketAnalytics = "projeto-imdb-analytics"
+
+
+    arquivoCsv = s3_client.get_object(
+        Bucket=bucketStage,
+        Key=nomeArquivo
+    ).get("Body")
+
+    dfArquivo = pd.read_csv(arquivoCsv, header=0, sep=",", quotechar='"')
+    logging.info(f"Convertendo arquivo {nomeArquivo}")
+
+    parquet_buffer = BytesIO()
+    dfArquivo.to_parquet(parquet_buffer, index=False)
+
+    nomeArquivoParquet = nomeArquivo.replace(".csv", ".parquet")
+
+    s3_client.put_object(Body=parquet_buffer.getvalue(), Bucket=bucketAnalytics,
+                         Key=nomeArquivoParquet)
+
+    logging.info(f"Arquivo {nomeArquivoParquet} salvo no bucket analytics.")
+

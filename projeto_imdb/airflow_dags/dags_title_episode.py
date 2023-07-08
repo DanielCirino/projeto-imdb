@@ -46,6 +46,7 @@ with DAG(
     task_converter_arquivos_csv_para_parquet = PythonOperator(
         task_id="tsk_converter_arquivo_para_parquet",
         python_callable=converterArquivoParaParquet,
+        op_kwargs={"nomeArquivo":NOME_ARQUIVO_CSV},
         dag=dag
     )
 

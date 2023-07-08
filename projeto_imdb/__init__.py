@@ -6,6 +6,7 @@ import logging
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PYTHON_LOCATION=sys.executable
 os.environ["PYSPARK_PYTHON"] = PYTHON_LOCATION
+os.environ["SPARK_HOME"]="C:/Users/Daniel/Documents/Awari/EngenhariaDados/projeto-imdb/venv/Lib/site-packages/pyspark/"
 
 AMBIENTE = os.getenv("PROJETO_IMDB_ENV")
 PATH_ARQUIVO_CONFIG = f"{ROOT_DIR}/.env.test"
@@ -26,4 +27,4 @@ load_dotenv(PATH_ARQUIVO_CONFIG)
 
 logging.info(f"Ambiente da aplicação:{AMBIENTE}")
 logging.info(f"Python: {os.getenv('PYSPARK_PYTHON')}")
-logging.info(f"PySpark Python: {os.getenv('PYSPARK_PYTHON')}")
+logging.info(f"PySpark Python: {os.path.dirname(PYTHON_LOCATION)}")
