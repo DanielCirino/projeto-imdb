@@ -28,12 +28,11 @@ x-minio-common: &minio-common
 x-airflow-common: &airflow-common
   build:
     dockerfile: ./docker/airflow/Dockerfile
-  # image: apache/airflow:2.5.1-python3.8
   user: "${AIRFLOW_UID}:0"
   env_file:
     - ./docker/airflow/.env
   volumes:
-    - ../projeto_imdb/airflow_dags:/opt/airflow/dags
+    - ../projeto_imdb_dags:/opt/airflow/dags
     - ../data/airflow/logs:/opt/airflow/logs
     - ../data/airflow/downloads:/opt/airflow/downloads
     - ../data/airflow/plugins:/opt/airflow/plugins
@@ -46,6 +45,14 @@ x-airflow-depends-on: &airflow-depends-on
     airflow-init:
       condition: service_completed_successfully
 
+
+# Settings dna configuration for apache-spark
+x-spark-common: &spark-common
+  build:
+    dockerfile: ./docker/spark/Dockerfile
+  volumes:
+      - ../data/spark/apps:/opt/spark-apps
+      - ../data/spark/data:/opt/spark-data
 
 services:
   minio-server-kevin:
@@ -146,7 +153,7 @@ services:
     restart: always
     command: webserver
     ports:
-      - "8080:8080"
+      - "8081:8080"
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
       interval: 30s
@@ -191,7 +198,8 @@ services:
   # Postgreql Service
   postgres-server:
     container_name: postgres-server
-    image: postgres:15.2-alpine3.17
+    hostname: postgres-server
+    image: postgres:latest
     ports:
       - "5431:5432"
     healthcheck:
@@ -229,16 +237,14 @@ services:
 
   #Cluster Spark
   spark-master:
+    <<: *spark-common
     container_name: spark-master
-    image: docker.io/bitnami/spark:3.3
+#    image: docker.io/bitnami/spark:3.3
     hostname: spark-master
     ports:
       - "9090:8080"
       - "7077:7077"
       - "20020:20020"
-    volumes:
-      - ../data/spark/apps:/opt/spark-apps
-      - ../data/spark/data:/opt/spark-data
     environment:
       - SPARK_LOCAL_IP=spark-master
       - SPARK_WORKLOAD=master
@@ -248,8 +254,8 @@ services:
         ipv4_address: 172.10.0.30
 
   spark-worker-a:
+    <<: *spark-common
     container_name: spark-worker-a
-    image: docker.io/bitnami/spark:3.3
     ports:
       - "9091:8080"
       - "7000:7000"
@@ -257,38 +263,10 @@ services:
       - spark-master
     environment:
       - SPARK_MASTER=spark://spark-master:7077
-      - SPARK_WORKER_CORES=2
+      - SPARK_WORKER_CORES=1
       - SPARK_WORKER_MEMORY=2G
-      - SPARK_DRIVER_MEMORY=2G
-      - SPARK_EXECUTOR_MEMORY=2G
       - SPARK_WORKLOAD=worker
       - SPARK_LOCAL_IP=spark-worker-a
-    volumes:
-      - ../data/spark/apps:/opt/spark-apps
-      - ../data/spark/data:/opt/spark-data
     networks:
       projeto-imdb-network:
         ipv4_address: 172.10.0.31
-
-  spark-worker-b:
-    container_name: spark-worker-b
-    image: docker.io/bitnami/spark:3.3
-    ports:
-      - "9092:8080"
-      - "7001:7000"
-    depends_on:
-      - spark-master
-    environment:
-      - SPARK_MASTER=spark://spark-master:7077
-      - SPARK_WORKER_CORES=2
-      - SPARK_WORKER_MEMORY=2G
-      - SPARK_DRIVER_MEMORY=2G
-      - SPARK_EXECUTOR_MEMORY=2G
-      - SPARK_WORKLOAD=worker
-      - SPARK_LOCAL_IP=spark-worker-b
-    volumes:
-      - ../data/spark/apps:/opt/spark-apps
-      - ../data/spark/data:/opt/spark-data
-    networks:
-      projeto-imdb-network:
-        ipv4_address: 172.10.0.32

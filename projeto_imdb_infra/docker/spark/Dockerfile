@@ -1,26 +1,19 @@
-FROM apache/airflow:2.6.3-python3.9
-
+FROM docker.io/bitnami/spark:3.4
 USER root
 
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends \
-         openjdk-11-jre-headless wget nano procps\
-  && apt-get autoremove -yqq --purge \
-  && apt-get clean \
-  && rm -rf /var/lib/apt/lists/*
-
-ENV SPARK_VERSION=3.4.1 \
-HADOOP_VERSION=3 \
-SPARK_HOME=/opt/spark
-
-RUN cd /tmp && wget https://dlcdn.apache.org/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz \
-&& mkdir -p /opt/spark \
-&& ls -l \
-&& tar -xf spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz -C /opt/spark --strip-components=1 \
-&& rm spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz
-
-RUN export SPARK_HOME=/opt/spark
-RUN export PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin
+RUN apt-get update  \
+    && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl wget\
+    git \
+    gnupg2 \
+    nano \
+    apt-transport-https \
+    software-properties-common \
+    openjdk-11-jre-headless \
+    && apt-get autoremove -yqq --purge \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Spark libraries
 
@@ -40,12 +33,8 @@ RUN cd /tmp && mkdir -p /tmp/s3deps && cd /tmp/s3deps \
   && echo $SPARK_HOME  \
   && mv /tmp/s3deps/* $SPARK_HOME/jars
 
-USER airflow
-RUN pip install --no-cache-dir "apache-airflow[amazon]==${AIRFLOW_VERSION}" python-dotenv boto3 pyspark==3.4.1
 
-# Set JAVA_HOME
-ENV JAVA_HOME /usr/lib/jvm/java-11-openjdk-amd64/
-RUN export JAVA_HOME
-RUN export SPARK_MASTER_URL=spark://spark-master:7077
+# Install NLTK
+RUN pip install nltk
 
-
+RUN which python

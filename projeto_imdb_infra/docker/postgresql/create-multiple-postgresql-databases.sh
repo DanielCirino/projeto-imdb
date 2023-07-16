@@ -20,7 +20,7 @@ readonly REQUIRED_ENV_VARS=(
 # - runs the SQL code to create user and database
 main() {
   check_env_vars_set
-#   init_user_and_db
+  init_user_and_db
 }
 
 # Checks if all of the required environment variables are set.
