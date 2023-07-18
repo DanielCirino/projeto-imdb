@@ -4,5 +4,5 @@ pyspark
 jupyterlab
 pandas
 beautifulsoup4
-apache-airflow==2.6.2
+apache-airflow==2.6.3
 apache-airflow-providers-google==10.1.0

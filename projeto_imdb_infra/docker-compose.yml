@@ -37,6 +37,7 @@ x-airflow-common: &airflow-common
     - ../data/airflow/downloads:/opt/airflow/downloads
     - ../data/airflow/plugins:/opt/airflow/plugins
     - /var/run/docker.sock:/var/run/docker.sock
+    - ../data/airflow/spark-jars:/opt/airflow/spark-jars
 
 x-airflow-depends-on: &airflow-depends-on
   depends_on:
@@ -48,11 +49,14 @@ x-airflow-depends-on: &airflow-depends-on
 
 # Settings dna configuration for apache-spark
 x-spark-common: &spark-common
-  build:
-    dockerfile: ./docker/spark/Dockerfile
+  build: ./docker/spark
+  image: spark-cluster:3.4.1
   volumes:
       - ../data/spark/apps:/opt/spark-apps
       - ../data/spark/data:/opt/spark-data
+      - ../data/spark/logs:/opt/spark/spark-events
+  env_file:
+    - ./docker/spark/.env
 
 services:
   minio-server-kevin:
@@ -184,12 +188,13 @@ services:
       dockerfile: ./docker/jupyterlab/Dockerfile
     volumes:
      - ../data/jupyter-notebooks/:/notebooks
+     - ../data/jupyter-notebooks/spark-jars/:/notebooks/spark-jars
     ports:
       - "8888:8888"
       - "20021:20020"
     environment:
       - JUPYTER_ENABLE_LAB=1
-      - SPARK_MASTER_IP=127.0.0.1
+      - SPARK_MASTER_IP=spark-master
     command: start-notebook.sh --NotebookApp.notebook_dir=/notebooks --NotebookApp.token='' --NotebookApp.password=''
     networks:
       projeto-imdb-network:
@@ -239,34 +244,48 @@ services:
   spark-master:
     <<: *spark-common
     container_name: spark-master
-#    image: docker.io/bitnami/spark:3.3
     hostname: spark-master
+    entrypoint: [ './entrypoint.sh', 'master' ]
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080" ]
+      interval: 5s
+      timeout: 3s
+      retries: 3
     ports:
-      - "9090:8080"
-      - "7077:7077"
-      - "20020:20020"
-    environment:
-      - SPARK_LOCAL_IP=spark-master
-      - SPARK_WORKLOAD=master
-      - SPARK_MASTER_IP=127.0.0.1
+      - '9090:8080'
+      - '7077:7077'
     networks:
       projeto-imdb-network:
         ipv4_address: 172.10.0.30
 
-  spark-worker-a:
+  spark-history-server:
     <<: *spark-common
-    container_name: spark-worker-a
-    ports:
-      - "9091:8080"
-      - "7000:7000"
+    container_name: spark-history
+    entrypoint: [ './entrypoint.sh', 'history' ]
     depends_on:
       - spark-master
-    environment:
-      - SPARK_MASTER=spark://spark-master:7077
-      - SPARK_WORKER_CORES=1
-      - SPARK_WORKER_MEMORY=2G
-      - SPARK_WORKLOAD=worker
-      - SPARK_LOCAL_IP=spark-worker-a
+    ports:
+      - '18080:18080'
     networks:
       projeto-imdb-network:
         ipv4_address: 172.10.0.31
+
+  spark-worker-a:
+    <<: *spark-common
+    container_name: spark-worker-a
+    entrypoint: ['./entrypoint.sh', 'worker']
+    depends_on:
+      - spark-master
+    networks:
+      projeto-imdb-network:
+        ipv4_address: 172.10.0.32
+
+  spark-worker-b:
+    <<: *spark-common
+    container_name: spark-worker-b
+    entrypoint: ['./entrypoint.sh', 'worker']
+    depends_on:
+      - spark-master
+    networks:
+      projeto-imdb-network:
+        ipv4_address: 172.10.0.33

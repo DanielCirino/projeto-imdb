@@ -9,22 +9,24 @@ RUN apt-get update \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
-ENV SPARK_VERSION=3.4.1 \
-HADOOP_VERSION=3 \
-SPARK_HOME=/opt/spark
+ENV SPARK_VERSION=3.4.1
+#HADOOP_VERSION=3
+#SPARK_HOME=/opt/spark
 
-RUN cd /tmp && wget https://dlcdn.apache.org/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz \
-&& mkdir -p /opt/spark \
-&& ls -l \
-&& tar -xf spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz -C /opt/spark --strip-components=1 \
-&& rm spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz
+#RUN cd /tmp && wget https://dlcdn.apache.org/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz \
+#&& mkdir -p /opt/spark \
+#&& ls -l \
+#&& tar -xf spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz -C /opt/spark --strip-components=1 \
+#&& rm spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz
+#
+#RUN export SPARK_HOME=/opt/spark
+#RUN export PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin
 
-RUN export SPARK_HOME=/opt/spark
-RUN export PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin
+USER airflow
 
 # Spark libraries
 
-RUN cd /tmp && mkdir -p /tmp/s3deps && cd /tmp/s3deps \
+RUN cd /tmp && mkdir -p /tmp/spark-jars && cd /tmp/spark-jars \
   && wget https://repo1.maven.org/maven2/joda-time/joda-time/2.12.2/joda-time-2.12.2.jar \
   && wget https://repo1.maven.org/maven2/org/apache/httpcomponents/client5/httpclient5/5.2.1/httpclient5-5.2.1.jar \
   && wget https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-s3/1.12.400/aws-java-sdk-s3-1.12.400.jar \
@@ -35,17 +37,16 @@ RUN cd /tmp && mkdir -p /tmp/s3deps && cd /tmp/s3deps \
   && wget https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar \
   && wget https://repo1.maven.org/maven2/org/slf4j/slf4j-api/2.0.6/slf4j-api-2.0.6.jar \
   && wget https://repo1.maven.org/maven2/org/slf4j/slf4j-reload4j/2.0.6/slf4j-reload4j-2.0.6.jar \
-#  && wget https://repo1.maven.org/maven2/org/apache/spark/spark-hadoop-cloud_2.13/3.3.1/spark-hadoop-cloud_2.13-3.3.1.jar\
+  && wget https://repo1.maven.org/maven2/org/apache/spark/spark-hadoop-cloud_2.13/3.3.1/spark-hadoop-cloud_2.13-3.3.1.jar\
   && wget https://jdbc.postgresql.org/download/postgresql-42.6.0.jar \
-  && echo $SPARK_HOME  \
-  && mv /tmp/s3deps/* $SPARK_HOME/jars
+  && mkdir -p /opt/airflow/spark-jars \
+  && mv /tmp/spark-jars/* /opt/airflow/spark-jars
 
-USER airflow
-RUN pip install --no-cache-dir "apache-airflow[amazon]==${AIRFLOW_VERSION}" python-dotenv boto3 pyspark==3.4.1
+RUN pip install --no-cache-dir "apache-airflow[amazon]==${AIRFLOW_VERSION}" python-dotenv boto3 pyspark==$SPARK_VERSION
 
 # Set JAVA_HOME
 ENV JAVA_HOME /usr/lib/jvm/java-11-openjdk-amd64/
 RUN export JAVA_HOME
-RUN export SPARK_MASTER_URL=spark://spark-master:7077
+#RUN export SPARK_MASTER_URL=spark://spark-master:7077
 
 
