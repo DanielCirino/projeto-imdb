@@ -31,7 +31,7 @@ RUN cd /tmp && mkdir -p /tmp/spark-jars && cd /tmp/spark-jars \
   && wget https://repo1.maven.org/maven2/org/apache/spark/spark-hadoop-cloud_2.13/3.3.1/spark-hadoop-cloud_2.13-3.3.1.jar\
   && wget https://jdbc.postgresql.org/download/postgresql-42.6.0.jar
 
-RUN pip install pyspark==3.4.1
+RUN pip install pyspark==3.4.1 boto3 pandas numpy matplotlib
 
 # Set JAVA_HOME
 ENV JAVA_HOME /usr/lib/jvm/java-11-openjdk-amd64/

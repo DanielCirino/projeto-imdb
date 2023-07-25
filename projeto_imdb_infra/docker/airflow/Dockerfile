@@ -10,17 +10,6 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 ENV SPARK_VERSION=3.4.1
-#HADOOP_VERSION=3
-#SPARK_HOME=/opt/spark
-
-#RUN cd /tmp && wget https://dlcdn.apache.org/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz \
-#&& mkdir -p /opt/spark \
-#&& ls -l \
-#&& tar -xf spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz -C /opt/spark --strip-components=1 \
-#&& rm spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz
-#
-#RUN export SPARK_HOME=/opt/spark
-#RUN export PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin
 
 USER airflow
 
@@ -47,6 +36,6 @@ RUN pip install --no-cache-dir "apache-airflow[amazon]==${AIRFLOW_VERSION}" pyth
 # Set JAVA_HOME
 ENV JAVA_HOME /usr/lib/jvm/java-11-openjdk-amd64/
 RUN export JAVA_HOME
-#RUN export SPARK_MASTER_URL=spark://spark-master:7077
+
 
 

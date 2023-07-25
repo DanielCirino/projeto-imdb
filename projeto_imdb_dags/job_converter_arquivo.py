@@ -6,7 +6,9 @@ import logging
 import setup_env
 
 from client_s3 import clientS3
-from client_spark import spark_client
+import client_spark
+
+
 
 parser = argparse.ArgumentParser(prog="Projeto IMDB - Converter",
                                  description="Job converter arquivo IMDB de *.csv para *.parquet")
@@ -17,11 +19,14 @@ try:
     args = parser.parse_args()
     nomeArquivo = args.filename
 
+
     bucketStage = "projeto-imdb-stage"
     bucketAnalytics = "projeto-imdb-analytics"
     diretorioArquivo = nomeArquivo[:-4].replace(".", "_")
 
     logging.info(f"Lendo arquivos *.csv do diretório {diretorioArquivo}")
+
+    spark_client = client_spark.obterSparkClient(f"convert-{diretorioArquivo}")
 
     dfArquivo = spark_client \
         .read \

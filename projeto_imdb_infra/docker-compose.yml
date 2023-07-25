@@ -1,4 +1,43 @@
 version: '3.7'
+
+volumes:
+  airflow-volume:
+    name: "airflow-volume"
+    driver: local
+  airflow-database-volume:
+    name: "airflow-database-volume"
+    driver: local
+  postgres-server-volume:
+    name: "postgres-server-volume"
+    driver: local
+  metabase-app-volume:
+    name: "metabase-app-volume"
+    driver: local
+  minio-server-volume-1-1:
+    name: "minio-server-volume-1-1"
+    driver: local
+  minio-server-volume-1-2:
+    name: "minio-server-volume-1-2"
+    driver: local
+  minio-server-volume-2-1:
+    name: "minio-server-volume-2-1"
+    driver: local
+  minio-server-volume-2-2:
+    name: "minio-server-volume-2-2"
+    driver: local
+  minio-server-volume-3-1:
+    name: "minio-server-volume-3-1"
+    driver: local
+  minio-server-volume-3-2:
+    name: "minio-server-volume-3-2"
+    driver: local
+  minio-server-volume-4-1:
+    name: "minio-server-volume-4-1"
+    driver: local
+  minio-server-volume-4-2:
+    name: "minio-server-volume-4-2"
+    driver: local
+
 networks:
   projeto-imdb-network:
       driver: bridge
@@ -8,7 +47,7 @@ networks:
               - subnet: "172.10.0.0/16"
                 gateway: "172.10.0.1"
 
-# Settings and configurations that are common for all minio containers
+# Configurações comuns aos servidores MinIO
 x-minio-common: &minio-common
   image: minio/minio:RELEASE.2023-02-22T18-23-45Z
   command: server --console-address ":9001" http://minio{1...4}/data{1...2}
@@ -24,7 +63,7 @@ x-minio-common: &minio-common
     timeout: 20s
     retries: 3
 
-# Settings dna configuration for apache-airflow
+# Configurações comuns ao Apache Airflow
 x-airflow-common: &airflow-common
   build:
     dockerfile: ./docker/airflow/Dockerfile
@@ -47,7 +86,7 @@ x-airflow-depends-on: &airflow-depends-on
       condition: service_completed_successfully
 
 
-# Settings dna configuration for apache-spark
+# Configurações comuns ao Apache Spark
 x-spark-common: &spark-common
   build: ./docker/spark
   image: spark-cluster:3.4.1
@@ -59,13 +98,16 @@ x-spark-common: &spark-common
     - ./docker/spark/.env
 
 services:
+  ###################################################
+  # Servidores MinIO
+  #==================================================
   minio-server-kevin:
     <<: *minio-common
     container_name: minio-server-kevin
     hostname: minio1
     volumes:
-      - ../data/minio/data1-1:/data1
-      - ../data/minio/data1-2:/data2
+      - minio-server-volume-1-1:/data1
+      - minio-server-volume-1-2:/data2
     networks:
       projeto-imdb-network:
         ipv4_address: 172.10.0.16
@@ -75,8 +117,8 @@ services:
     container_name: minio-server-dave
     hostname: minio2
     volumes:
-      - ../data/minio/data2-1:/data1
-      - ../data/minio/data2-2:/data2
+      - minio-server-volume-2-1:/data1
+      - minio-server-volume-2-2:/data2
     networks:
       projeto-imdb-network:
         ipv4_address: 172.10.0.17
@@ -86,8 +128,8 @@ services:
     container_name: minio-server-carl
     hostname: minio3
     volumes:
-      - ../data/minio/data3-1:/data1
-      - ../data/minio/data3-2:/data2
+      - minio-server-volume-3-1:/data1
+      - minio-server-volume-3-2:/data2
     networks:
       projeto-imdb-network:
         ipv4_address: 172.10.0.18
@@ -97,8 +139,8 @@ services:
     container_name: minio-server-bob
     hostname: minio4
     volumes:
-      - ../data/minio/data4-1:/data1
-      - ../data/minio/data4-2:/data2
+      - minio-server-volume-4-1:/data1
+      - minio-server-volume-4-2:/data2
     networks:
       projeto-imdb-network:
         ipv4_address: 172.10.0.19
@@ -122,7 +164,10 @@ services:
         ipv4_address: 172.10.0.20
 
 
-  # Airflow Services
+  ###################################################
+  # Servidores Apache Airflow
+  #==================================================
+
   airflow-database:
     container_name: airflow-database
     image: postgres:latest
@@ -135,7 +180,7 @@ services:
     env_file:
       - ./docker/airflow/.env
     volumes:
-      - ../data/airflow/postgres-data:/var/lib/postgresql/data
+      - airflow-database-volume:/var/lib/postgresql/data
     networks:
       projeto-imdb-network:
         ipv4_address: 172.10.0.110
@@ -181,14 +226,16 @@ services:
     networks:
       - projeto-imdb-network
 
-  # Jupyter Lab Service
+  ###################################################
+  # Servidor Jupyter Lab
+  #==================================================
   jupyterlab-server:
     container_name: jupyterlab-server
     build:
       dockerfile: ./docker/jupyterlab/Dockerfile
     volumes:
-     - ../data/jupyter-notebooks/:/notebooks
-     - ../data/jupyter-notebooks/spark-jars/:/notebooks/spark-jars
+     - ../projeto_imdb_notebooks:/notebooks
+#     - ../projeto_imdb_notebooks/spark-jars:/notebooks/spark-jars
     ports:
       - "8888:8888"
       - "20021:20020"
@@ -200,7 +247,9 @@ services:
       projeto-imdb-network:
         ipv4_address: 172.10.0.10
 
-  # Postgreql Service
+  ###################################################
+  # Servidor PostgreSQL
+  #==================================================
   postgres-server:
     container_name: postgres-server
     hostname: postgres-server
@@ -214,13 +263,15 @@ services:
     env_file:
       - ./docker/postgresql/.env
     volumes:
-      - ../data/postgresql/data:/var/lib/postgresql/data
+      - postgres-server-volume:/var/lib/postgresql/data
       - ./docker/postgresql/create-multiple-postgresql-databases.sh:/docker-entrypoint-initdb.d/01-create-db.sh
     networks:
       projeto-imdb-network:
         ipv4_address: 172.10.0.6
 
-  #Metabase Service
+  ###################################################
+  # Servidor Metabase
+  #==================================================
   metabase-app:
     container_name: metabase-app
     image: metabase/metabase:v0.45.3
@@ -228,8 +279,7 @@ services:
     ports:
       - "3001:3000"
     volumes:
-      # declare your mount volume /host/dir:/container/dir
-      - ../data/metabase/data:/metabase-data
+      - metabase-app-volume:/metabase-data
     env_file:
       - ./docker/metabase/.env
     depends_on:
@@ -240,7 +290,9 @@ services:
       projeto-imdb-network:
         ipv4_address: 172.10.0.25
 
-  #Cluster Spark
+  ###################################################
+  # Cluster Apache Spark Standalone
+  #==================================================
   spark-master:
     <<: *spark-common
     container_name: spark-master
@@ -276,6 +328,14 @@ services:
     entrypoint: ['./entrypoint.sh', 'worker']
     depends_on:
       - spark-master
+    environment:
+      - SPARK_WORKER_CORES=2
+      - SPARK_WORKER_MEMORY=2G
+      - SPARK_DRIVER_MEMORY=2G
+      - SPARK_EXECUTOR_MEMORY=2G
+    ports:
+      - '9091:8080'
+      - '7000:7000'
     networks:
       projeto-imdb-network:
         ipv4_address: 172.10.0.32
@@ -286,6 +346,50 @@ services:
     entrypoint: ['./entrypoint.sh', 'worker']
     depends_on:
       - spark-master
+    environment:
+      - SPARK_WORKER_CORES=2
+      - SPARK_WORKER_MEMORY=2G
+      - SPARK_DRIVER_MEMORY=2G
+      - SPARK_EXECUTOR_MEMORY=2G
+    ports:
+      - '9092:8080'
+      - '7001:7000'
     networks:
       projeto-imdb-network:
         ipv4_address: 172.10.0.33
+
+  spark-worker-c:
+    <<: *spark-common
+    container_name: spark-worker-c
+    entrypoint: [ './entrypoint.sh', 'worker' ]
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_WORKER_CORES=2
+      - SPARK_WORKER_MEMORY=2G
+      - SPARK_DRIVER_MEMORY=2G
+      - SPARK_EXECUTOR_MEMORY=2G
+    ports:
+      - '9093:8080'
+      - '7002:7000'
+    networks:
+      projeto-imdb-network:
+        ipv4_address: 172.10.0.34
+
+  spark-worker-d:
+    <<: *spark-common
+    container_name: spark-worker-d
+    entrypoint: [ './entrypoint.sh', 'worker' ]
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_WORKER_CORES=2
+      - SPARK_WORKER_MEMORY=2G
+      - SPARK_DRIVER_MEMORY=2G
+      - SPARK_EXECUTOR_MEMORY=2G
+    ports:
+      - '9094:8080'
+      - '7003:7000'
+    networks:
+      projeto-imdb-network:
+        ipv4_address: 172.10.0.35

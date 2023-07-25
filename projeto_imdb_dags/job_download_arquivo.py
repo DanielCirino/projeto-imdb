@@ -17,7 +17,14 @@ try:
     urlArquivo = args.url
 
     anoMesDia = datetime.now().strftime("%Y-%m-%d")
+
+    ANO = datetime.now().strftime("%Y")
+    MES = datetime.now().strftime("%m")
+    DIA = datetime.now().strftime("%d")
+
     nomeArquivo = os.path.basename(urlArquivo)
+
+    diretorio = f"year={ANO}/month={MES}/day={DIA}/downloaded/{nomeArquivo}"
 
     session = requests.Session()
     headers = {
@@ -32,9 +39,9 @@ try:
 
     clientS3.put_object(
         Body=arquivoCompactado, Bucket='projeto-imdb-raw',
-        Key=f"{anoMesDia}/downloaded/{nomeArquivo}")
+        Key=diretorio)
 
-    logging.info(f"Arquivo salvo em: {anoMesDia}/downloaded/{nomeArquivo}")
+    logging.info(f"Arquivo salvo em: {diretorio}")
 
 
 

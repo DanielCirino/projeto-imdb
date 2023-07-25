@@ -41,13 +41,13 @@ check_env_vars_set() {
 
 # Performs the initialization in the already-started PostgreSQL
 # using the preconfigured POSTGRE_USER user.
-# init_user_and_db() {
-#   psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
-#      CREATE USER $DB_USER WITH PASSWORD '$DB_PASSWORD';
-#      CREATE DATABASE $DB_DATABASE;
-#      GRANT ALL PRIVILEGES ON DATABASE $DB_DATABASE TO $DB_USER;
-# EOSQL
-# }
+ init_user_and_db() {
+   psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
+      CREATE USER $DB_USER WITH PASSWORD '$DB_PASSWORD';
+      CREATE DATABASE $DB_DATABASE;
+      GRANT ALL PRIVILEGES ON DATABASE $DB_DATABASE TO $DB_USER;
+ EOSQL
+ }
 
 function create_user_and_database() {
     local DB_DATABASE=$1

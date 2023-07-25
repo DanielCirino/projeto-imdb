@@ -5,3 +5,4 @@ data/
 .env.test
 __pycache__/
 *.pyc
+*/spark-jars

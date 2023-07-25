@@ -7,7 +7,7 @@ import tempfile
 import setup_env
 
 from client_s3 import clientS3
-from client_spark import spark_client
+import client_spark
 
 parser = argparse.ArgumentParser(prog="Projeto IMDB - Descompactar",
                                  description="Job Descompactar Arquivo IMDB")
@@ -25,13 +25,14 @@ try:
 
     for obj in objetosS3.get("Contents"):
         chave = obj["Key"]
-        dataArquivo, diretorio, nomeArquivo = chave.split("/")
+        ano, mes, dia, etapa, nomeArquivo = chave.split("/")
 
-        if diretorio == "downloaded" and nomeArquivo == nomeArquivoCompactado:
+        if etapa == "downloaded" and nomeArquivo == nomeArquivoCompactado:
             nomeArquivoCsv = nomeArquivo.replace(".tsv.gz", ".csv")
             diretorioArquivoCSV = nomeArquivoCsv[:-4].replace(".", "_")
 
             logging.info(f"Lendo arquivo arquivo {chave}")
+            spark_client = client_spark.obterSparkClient(f"unzip-{diretorioArquivoCSV}")
 
             dfArquivo = spark_client \
                 .read \
